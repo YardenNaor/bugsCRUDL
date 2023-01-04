@@ -1,4 +1,7 @@
 const fs = require('fs');
+const Cryptr = require('cryptr')
+const cryptr = new Cryptr('secret-bug-1234')
+
 
 var users = require('../data/user.json')
 
@@ -13,9 +16,12 @@ module.exports = {
     validateToken
 }
 
-function query(filterBy) {
-    let fillteredUsers = users
-    return Promise.resolve(fillteredUsers)
+function getLoginToken(user) {
+    return cryptr.encrypt(JSON.stringify(user))
+}
+
+function query() {
+    return Promise.resolve(users)
 }
 
 function get(userId) {
@@ -24,30 +30,38 @@ function get(userId) {
     return Promise.resolve(user)
 }
 
-function remove(userId, loggedinUser) {
+function remove(userId) {
     const idx = users.findIndex(user => user._id === userId)
-    if (idx === -1) return Promise.reject('No Such User')
-    const user = users[idx]
-    if (user.owner._id !== loggedinUser._id) return Promise.reject('Not your User')
+    if (idx === -1) return Promise.reject('No such user')
     users.splice(idx, 1)
-    return _saveUsersToFile()
 }
 
-
-function save(user, loggedinUser) {
-    if (user._id) {
-        const userToUpdate = users.find(currUser => currUser._id === user._id)
-        if (!userToUpdate) return Promise.reject('No such User')
-        if (userToUpdate.owner._id !== loggedinUser._id) return Promise.reject('Not your User')
-
-        userToUpdate.vendor = user.vendor
-        userToUpdate.speed = user.speed
-    } else {
-        user._id = _makeId()
-        user.owner = loggedinUser
-        users.push(user)
+function signup({ fullname, username, password }) {
+    const userToSave = {
+        _id: _makeId(),
+        fullname,
+        username,
+        password
     }
-    return _writeUsersToFile().then(() => user)
+    users.push(userToSave)
+    return _writeUsersToFile().then(() => userToSave)
+}
+
+function login(credentials) {
+    const user = users.find(user => user.username === credentials.username)
+    if (!user) return Promise.reject('Login failed')
+    return Promise.resolve(user)
+}
+
+function validateToken(loginToken) {
+    try {
+        const json = cryptr.decrypt(loginToken)
+        const loggedinUser=JSON.parse(json)
+        return loggedinUser
+    } catch (err){
+        console.log('Invalid login token')
+    }
+    return null
 }
 
 function _makeId(length = 5) {
