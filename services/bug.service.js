@@ -1,6 +1,6 @@
 const fs = require('fs');
 // const PAGE_SIZE = 4
-var bugs = require('../data/bugs.json')
+var bugs = require('../data/bug.json')
 
 module.exports = {
     query,
@@ -13,6 +13,7 @@ function query(filterBy, sortBy) {
     let filteredBugs = bugs
     // Filtering
     if (filterBy.title) {
+        sortByCategory
         const regex = new RegExp(filterBy.title, 'i')
         filteredBugs = filteredBugs.filter(bug => regex.test(bug.title))
     }
@@ -27,8 +28,8 @@ function query(filterBy, sortBy) {
 
     // Sorting
     if (sortBy) {
-        if (sortBy.sortByCat === 'createdAt' || sortBy.sortByCat === 'severity') {
-            filteredBugs.sort((b1, b2) => (b1[sortBy.sortByCat] - b2[sortBy.sortByCat]) * sortBy.desc)
+        if (sortBy.sortByCategory === 'createdAt' || sortBy.sortByCategory === 'severity') {
+            filteredBugs.sort((b1, b2) => (b1[sortBy.sortByCategory] - b2[sortBy.sortByCategory]) * sortBy.desc)
         }
         if (filterBy.sortBy === 'title') {
             filteredBugs.sort((b1, b2) => b1.title.localeCompare(b2.title) * sortBy.desc)
@@ -51,19 +52,27 @@ function get(bugId) {
     return Promise.resolve(bug)
 }
 
-function remove(bugId) {
-    bugs = bugs.filter(bug => bug._id !== bugId)
+function remove(bugId, loggedinUser) {
+    const idx = findIndex(bug => bug._id === bugId)
+    if (idx === -1) return Promise.reject('No such bug')
+    const bug = bugs[idx]
+    if (bug.owner._id !== loggedinUser._id) return Promise.reject('Not your Bug')
+    bugs.splice(idx, 1)
     return _writeBugsToFile()
 }
 
-function save(bug) {
+function save(bug, loggedinUser) {
     if (bug._id) {
         const bugToUpdate = bugs.find(currbug => currbug._id === bug._id)
+        if (!bugToUpdate) return Promise.reject('No such Car')
+        if (bugToUpdate.owner._id !== loggedinUser._id) return Promise.reject('Not your Bug')
         bugToUpdate.title = bug.title
         bugToUpdate.descprition = bug.descprition
         bugToUpdate.severity = bug.severity
     } else {
         bug._id = _makeId()
+        bug.owner = loggedinUser
+ 
         bugs.push(bug)
     }
     return _writeBugsToFile().then(() => bug)
